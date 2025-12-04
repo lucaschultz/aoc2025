@@ -3,108 +3,113 @@ import run from "aocrunner"
 type Warehouse = Array<Array<string>>
 
 function parseWarehouse(rawInput: string): Warehouse {
-  return rawInput.trim().split("\n").map(line => line.split(""))
+  return rawInput.split("\n").map((line) => line.split(""))
 }
 
-type WarehousePosition = readonly [row: number, col: number]
-
-const WarehouseItem = {
-  Empty: ".",
-  Box: "@",
-} as const
-
-type WarehouseItem = typeof WarehouseItem[keyof typeof WarehouseItem]
-
-function getWarehouseItem(warehouse: Warehouse, position: WarehousePosition): WarehouseItem {  
-  return warehouse[position[0]]?.[position[1]] === WarehouseItem.Box ? WarehouseItem.Box : WarehouseItem.Empty
-}
-
-/**
- * Returns a new warehouse with the item set at the given position
- * 
- * @remark This is **not efficient**, but it is a pure function and uses the `map` method as requested by Flo
- */
-function setWarehouseItem(warehouse: Warehouse, position: WarehousePosition, item: WarehouseItem): Warehouse {
-  return warehouse.map((row, rowIndex) => {
-    return row.map((col, colIndex) => {
-      if (rowIndex === position[0] && colIndex === position[1]) {
-        return item
-      }
-      return col
-    })
-  })
-}
-
-function addPositions(a: WarehousePosition, b: WarehousePosition): WarehousePosition {
-  return [a[0] + b[0], a[1] + b[1]]
-}
-
-const Side  = {
-  Top: [-1, 0],
-  TopRight: [-1, +1],
-  Right: [0,1],
-  BottomRight: [1,1],
-  Bottom: [1, 0],
-  BottomLeft: [1, -1],
-  Left: [0, -1],
-  TopLeft: [-1, -1],
-} as const
-
-function getNeighbor(warehouse: Array<Array<string>>, position: WarehousePosition, side: keyof typeof Side): WarehouseItem {
-  return getWarehouseItem(warehouse, addPositions(position, Side[side]))
-}
-
-function countBoxNeighbors(warehouse: Warehouse, position: WarehousePosition): number {
-  return Object.keys(Side).reduce((count, side) => {
-    return count + (getNeighbor(warehouse, position, side as keyof typeof Side) === WarehouseItem.Box ? 1 : 0)
-  }, 0)
-}
-
-function removeBoxes(currentWarehouse: Warehouse): number {
-  // this is why using `.reduce` is considered an anti pattern by some developers...
-  const { updatedWarehouse, boxesRemoved } = currentWarehouse.reduce(
-    (acc, row, rowIndex) => {
-      const rowResult = row.reduce(
-        (rowAcc, _, colIndex) => {
-          const position: WarehousePosition = [rowIndex, colIndex]
-          if (getWarehouseItem(rowAcc.warehouse, position) === WarehouseItem.Box &&
-            countBoxNeighbors(rowAcc.warehouse, position) < 4) {
-            return {
-              warehouse: setWarehouseItem(rowAcc.warehouse, position, WarehouseItem.Empty),
-              count: rowAcc.count + 1,
-            }
-          }
-          return rowAcc
-        },
-        { warehouse: acc.updatedWarehouse, count: 0 }
-      )
-      return {
-        updatedWarehouse: rowResult.warehouse,
-        boxesRemoved: acc.boxesRemoved + rowResult.count,
-      }
-    },
-    { updatedWarehouse: currentWarehouse, boxesRemoved: 0 }
+function isRoll(warehouse: Warehouse, row: number, col: number): boolean {
+  // In my limited testing this was faster than optional chaining
+  return (
+    row >= 0 &&
+    row < warehouse.length &&
+    col >= 0 &&
+    col < warehouse[row]!.length &&
+    warehouse[row]![col] === "@"
   )
+}
 
-  return boxesRemoved > 0 ? boxesRemoved + removeBoxes(updatedWarehouse) : 0
+function isAccessible(warehouse: Warehouse, row: number, col: number): boolean {
+  let rollCount = 0
+
+  // Top
+  if (isRoll(warehouse, row - 1, col)) {
+    rollCount++
+    if (rollCount === 4) {
+      return false
+    }
+  }
+
+  // TopRight
+  if (isRoll(warehouse, row - 1, col + 1)) {
+    rollCount++
+    if (rollCount === 4) {
+      return false
+    }
+  }
+
+  // Right
+  if (isRoll(warehouse, row, col + 1)) {
+    rollCount++
+    if (rollCount === 4) {
+      return false
+    }
+  }
+
+  // BottomRight
+  if (isRoll(warehouse, row + 1, col + 1)) {
+    rollCount++
+    if (rollCount === 4) {
+      return false
+    }
+  }
+
+  // Bottom
+  if (isRoll(warehouse, row + 1, col)) {
+    rollCount++
+    if (rollCount === 4) {
+      return false
+    }
+  }
+
+  // BottomLeft
+  if (isRoll(warehouse, row + 1, col - 1)) {
+    rollCount++
+    if (rollCount === 4) {
+      return false
+    }
+  }
+
+  // Left
+  if (isRoll(warehouse, row, col - 1)) {
+    rollCount++
+    if (rollCount === 4) {
+      return false
+    }
+  }
+
+  // TopLeft
+  if (isRoll(warehouse, row - 1, col - 1)) {
+    rollCount++
+    if (rollCount === 4) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function countRemovableRolls(warehouse: Warehouse): number {
+  const rowLength = warehouse.length
+  const colLength = warehouse[0]!.length // Assumes all rows have the same length and the warehouse is not empty
+
+  let removableRolls = 0
+  for (let row = 0; row < rowLength; row++) {
+    for (let col = 0; col < colLength; col++) {
+      if (isRoll(warehouse, row, col) && isAccessible(warehouse, row, col)) {
+        removableRolls++
+      }
+    }
+  }
+
+  return removableRolls
 }
 
 const part1 = (rawInput: string) => {
-  return parseWarehouse(rawInput).reduce((total, row, rowIndex, warehouse) => {
-    return total + row.reduce((rowTotal, item, colIndex) => {
-      if (item === WarehouseItem.Box) {
-        if (countBoxNeighbors(warehouse, [rowIndex, colIndex]) < 4) {
-          return rowTotal + 1
-        }
-      }
-
-      return rowTotal
-    }, 0)
-  }, 0)
+  const warehouse = parseWarehouse(rawInput)
+  return countRemovableRolls(warehouse)
 }
 
 const part2 = (rawInput: string) => {
-  return removeBoxes(parseWarehouse(rawInput))
+  return 0
 }
 
 run({
