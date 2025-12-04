@@ -90,9 +90,9 @@ Both parts: -
 
 ```
 Day 04
-Time part 1: 3.919ms
-Time part 2: 577.747ms
-Both parts: 581.666ms
+Time part 1: 0.942ms
+Time part 2: 10.141ms
+Both parts: 11.083 ms
 ```
 
 ```
